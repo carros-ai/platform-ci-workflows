@@ -15,6 +15,10 @@ on:
         description: "Create semver release — true on merge to main, false on skill deploy"
         type: boolean
         default: false
+      health-check-url:
+        description: "URL to hit after deploy to confirm the service is up (e.g. https://myapp.carros-ai.online/health). Skip if empty."
+        type: string
+        default: ""
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
@@ -23,18 +27,40 @@ on:
         description: "Coolify API token with deploy permission"
         required: true
 
-jobs:
-  release:
-    name: Build & Deploy
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
+concurrency:
+  group: ${{ github.repository }}-${{ inputs.app-name }}-release-${{ github.ref }}
+  cancel-in-progress: false
 
+jobs:
+  # ── Security and quality run in parallel ──────────────────────────────────
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  quality:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -52,10 +78,75 @@ jobs:
             npx eslint .
           fi
 
-      - name: Test
-        run: npm test
+      - name: Type check
+        run: |
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          fi
 
-      # --- semver (only on release: true) ---
+      - name: Test
+        run: |
+          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ] || [ -f "vitest.config.mts" ]; then
+            npx vitest run --coverage \
+              --coverage.thresholds.lines=80 \
+              --coverage.thresholds.functions=80 \
+              --coverage.thresholds.branches=80 \
+              --coverage.thresholds.statements=80
+          elif grep -q '"jest"' package.json 2>/dev/null || [ -f "jest.config.js" ] || [ -f "jest.config.ts" ]; then
+            npx jest --coverage \
+              --coverageThreshold='{"global":{"lines":80,"functions":80,"branches":80,"statements":80}}'
+          else
+            npm test
+          fi
+
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/javascript
+            p/typescript
+            p/security-audit
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: CodeQL init
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: CodeQL analyze
+        uses: github/codeql-action/analyze@v3
+
+  # ── Build after security + quality + sast pass ────────────────────────────
+
+  build:
+    name: Build & Push
+    needs: [security, quality, sast]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create git tags
+      packages: write  # push to ghcr.io
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      new_tag: ${{ steps.tag.outputs.new_tag }}
+      version_full: ${{ steps.version.outputs.full }}
+      version_minor: ${{ steps.version.outputs.minor }}
+      version_major: ${{ steps.version.outputs.major }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Bump version and push tag
         id: tag
@@ -74,8 +165,6 @@ jobs:
           echo "full=$VERSION" >> $GITHUB_OUTPUT
           echo "minor=$(echo $VERSION | cut -d. -f1-2)" >> $GITHUB_OUTPUT
           echo "major=$(echo $VERSION | cut -d. -f1)" >> $GITHUB_OUTPUT
-
-      # --- Docker ---
 
       - uses: docker/login-action@v3
         with:
@@ -97,6 +186,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           push: true
@@ -105,15 +195,84 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ── Container scan after build ────────────────────────────────────────────
+
+  scan:
+    name: Container scan
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+      security-events: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Container security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/carros-ai/${{ inputs.app-name }}@${{ needs.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ── Deploy after scan passes ──────────────────────────────────────────────
+
+  deploy:
+    name: Deploy
+    needs: [build, scan]
+    runs-on: ubuntu-latest
+    environment: production  # enables GitHub Insights DORA metrics
+    permissions:
+      contents: write   # create GitHub release
+      id-token: write   # Cosign OIDC keyless signing
+      packages: write   # push Cosign signature to ghcr.io
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- SBOM ---
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ghcr.io/carros-ai/${{ inputs.app-name }}@${{ needs.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      # --- Cosign: sign image (keyless via OIDC, no key management needed) ---
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign image
+        run: |
+          cosign sign --yes \
+            ghcr.io/carros-ai/${{ inputs.app-name }}@${{ needs.build.outputs.digest }}
+
       # --- GitHub Release (only on release: true) ---
 
       - name: Create GitHub Release
         if: inputs.release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ steps.tag.outputs.new_tag }}
-          name: ${{ steps.tag.outputs.new_tag }}
+          tag: ${{ needs.build.outputs.new_tag }}
+          name: ${{ needs.build.outputs.new_tag }}
           generateReleaseNotes: true
+          artifacts: sbom.spdx.json
 
       # --- Deploy ---
 
@@ -122,3 +281,13 @@ jobs:
           curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
             "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+
+      - name: Smoke test
+        if: inputs.health-check-url != ''
+        run: |
+          curl -fsSL \
+            --retry 10 \
+            --retry-delay 15 \
+            --retry-connrefused \
+            "${{ inputs.health-check-url }}"
+          echo "Service is healthy"

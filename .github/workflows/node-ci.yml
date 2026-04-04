@@ -8,8 +8,53 @@ on:
         type: string
         default: "20"
 
+concurrency:
+  group: ${{ github.repository }}-node-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/javascript
+            p/typescript
+            p/security-audit
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  quality:
     name: Test & Lint
     runs-on: ubuntu-latest
     steps:
@@ -31,5 +76,23 @@ jobs:
             npx eslint .
           fi
 
+      - name: Type check
+        run: |
+          if [ -f "tsconfig.json" ]; then
+            npx tsc --noEmit
+          fi
+
       - name: Test
-        run: npm test
+        run: |
+          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ] || [ -f "vitest.config.mts" ]; then
+            npx vitest run --coverage \
+              --coverage.thresholds.lines=80 \
+              --coverage.thresholds.functions=80 \
+              --coverage.thresholds.branches=80 \
+              --coverage.thresholds.statements=80
+          elif grep -q '"jest"' package.json 2>/dev/null || [ -f "jest.config.js" ] || [ -f "jest.config.ts" ]; then
+            npx jest --coverage \
+              --coverageThreshold='{"global":{"lines":80,"functions":80,"branches":80,"statements":80}}'
+          else
+            npm test
+          fi
