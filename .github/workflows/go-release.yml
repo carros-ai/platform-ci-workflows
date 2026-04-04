@@ -10,7 +10,7 @@ on:
       go-version:
         description: "Go version"
         type: string
-        default: "1.23"
+        default: "1.24"
       release:
         description: "Create semver release — true on merge to main, false on skill deploy"
         type: boolean
