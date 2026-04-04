@@ -1,0 +1,35 @@
+name: Node CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version"
+        type: string
+        default: "20"
+
+jobs:
+  ci:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: |
+          if [ -f "biome.json" ] || [ -f "biome.jsonc" ]; then
+            npx biome check .
+          else
+            npx eslint .
+          fi
+
+      - name: Test
+        run: npm test
