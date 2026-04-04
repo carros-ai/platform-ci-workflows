@@ -19,6 +19,9 @@ on:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
         required: true
+      COOLIFY_DEPLOY_TOKEN:
+        description: "Coolify API token with deploy permission"
+        required: true
 
 jobs:
   release:
@@ -109,4 +112,7 @@ jobs:
       # --- Deploy ---
 
       - name: Deploy via Coolify
-        run: curl -fsSL "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+        run: |
+          curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
