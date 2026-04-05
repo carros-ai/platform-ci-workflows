@@ -54,16 +54,28 @@ jobs:
           python-version: ${{ inputs.python-version }}
           cache: pip
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Configure git auth for private packages
         run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          if [ -f "uv.lock" ]; then
+            uv sync --all-extras
+          else
+            pip install -e ".[dev]"
+          fi
 
       - name: Dependency audit
         run: |
-          pip install pip-audit
-          pip-audit
+          if [ -f "uv.lock" ]; then
+            uv run pip-audit
+          else
+            pip install pip-audit
+            pip-audit
+          fi
 
   quality:
     name: Test & Lint
@@ -76,27 +88,53 @@ jobs:
           python-version: ${{ inputs.python-version }}
           cache: pip
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Configure git auth for private packages
         run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          if [ -f "uv.lock" ]; then
+            uv sync --all-extras
+          else
+            pip install -e ".[dev]"
+          fi
 
       - name: Lint
-        run: ruff check . && ruff format --check .
+        run: |
+          if [ -f "uv.lock" ]; then
+            uv run ruff check . && uv run ruff format --check .
+          else
+            ruff check . && ruff format --check .
+          fi
 
       - name: Type check
         run: |
-          pip install mypy
-          mypy . --ignore-missing-imports
+          if [ -f "uv.lock" ]; then
+            uv run mypy . --ignore-missing-imports
+          else
+            pip install mypy
+            mypy . --ignore-missing-imports
+          fi
 
       - name: Security lint
         run: |
-          pip install bandit
-          bandit -r . -ll --exclude ./.venv,./venv,./tests,./test
+          if [ -f "uv.lock" ]; then
+            uv run bandit -r . -ll --exclude ./.venv,./venv,./tests,./test
+          else
+            pip install bandit
+            bandit -r . -ll --exclude ./.venv,./venv,./tests,./test
+          fi
 
       - name: Test
-        run: pytest --tb=short --cov --cov-fail-under=80
+        run: |
+          if [ -f "uv.lock" ]; then
+            uv run pytest --tb=short --cov --cov-fail-under=80
+          else
+            pytest --tb=short --cov --cov-fail-under=80
+          fi
 
   sast:
     name: SAST
