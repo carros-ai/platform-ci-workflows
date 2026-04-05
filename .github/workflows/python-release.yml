@@ -19,6 +19,10 @@ on:
         description: "URL to hit after deploy to confirm the service is up (e.g. https://myapp.carros-ai.online/health). Skip if empty."
         type: string
         default: ""
+      server-internal-ip:
+        description: "Private/internal IP of the Coolify server (e.g. Hetzner private IP). Used to route the deploy request through the VPN tunnel avoiding routing loops with the public IP."
+        type: string
+        default: ""
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
@@ -307,21 +311,19 @@ jobs:
 
       - name: Connect to VPN
         run: |
-          COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
-          COOLIFY_IP=$(dig +short "$COOLIFY_HOST" @1.1.1.1 | tail -1)
-          echo "COOLIFY_IP=$COOLIFY_IP" >> $GITHUB_ENV
           sudo apt-get install -y wireguard-tools resolvconf
           echo "${{ secrets.WG_CI_CONFIG }}" | sudo tee /etc/wireguard/wg0.conf > /dev/null
           sudo chmod 600 /etc/wireguard/wg0.conf
           sudo wg-quick up wg0
-          sudo ip route add "$COOLIFY_IP/32" dev wg0 || true
 
       - name: Deploy via Coolify
         run: |
           COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
-          curl -fsSL \
-            --resolve "$COOLIFY_HOST:443:$COOLIFY_IP" \
-            --resolve "$COOLIFY_HOST:80:$COOLIFY_IP" \
+          RESOLVE_ARGS=""
+          if [ -n "${{ inputs.server-internal-ip }}" ]; then
+            RESOLVE_ARGS="--resolve $COOLIFY_HOST:443:${{ inputs.server-internal-ip }} --resolve $COOLIFY_HOST:80:${{ inputs.server-internal-ip }}"
+          fi
+          curl -fsSL $RESOLVE_ARGS \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
             "${{ secrets.COOLIFY_WEBHOOK_URL }}"
 
