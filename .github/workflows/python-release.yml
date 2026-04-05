@@ -52,7 +52,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
-          cache: pip
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -89,7 +88,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python-version }}
-          cache: pip
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -127,6 +125,7 @@ jobs:
       - name: Security lint
         run: |
           if [ -f "uv.lock" ]; then
+            uv pip install bandit
             uv run bandit -r . -ll --exclude ./.venv,./venv,./tests,./test
           else
             pip install bandit
