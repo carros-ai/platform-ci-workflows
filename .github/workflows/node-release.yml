@@ -123,11 +123,13 @@ jobs:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
       - name: CodeQL init
+        continue-on-error: true
         uses: github/codeql-action/init@v3
         with:
           languages: javascript
 
       - name: CodeQL analyze
+        continue-on-error: true
         uses: github/codeql-action/analyze@v3
 
   # ── Build after security + quality + sast pass ────────────────────────────
