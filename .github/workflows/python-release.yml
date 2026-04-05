@@ -72,7 +72,6 @@ jobs:
       - name: Dependency audit
         run: |
           if [ -f "uv.lock" ]; then
-            uv pip install pip-audit
             uv run pip-audit
           else
             pip install pip-audit
@@ -125,7 +124,6 @@ jobs:
       - name: Security lint
         run: |
           if [ -f "uv.lock" ]; then
-            uv pip install bandit
             uv run bandit -r . -ll --exclude ./.venv,./venv,./tests,./test
           else
             pip install bandit
@@ -309,6 +307,10 @@ jobs:
 
       - name: Connect to VPN
         run: |
+          # Resolve Coolify host before VPN changes DNS
+          COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
+          COOLIFY_IP=$(dig +short "$COOLIFY_HOST" @1.1.1.1 | tail -1)
+          echo "COOLIFY_IP=$COOLIFY_IP" >> $GITHUB_ENV
           sudo apt-get install -y wireguard-tools resolvconf
           echo "${{ secrets.WG_CI_CONFIG }}" | sudo tee /etc/wireguard/wg0.conf > /dev/null
           sudo chmod 600 /etc/wireguard/wg0.conf
@@ -316,9 +318,11 @@ jobs:
 
       - name: Deploy via Coolify
         run: |
+          DEPLOY_URL="${{ secrets.COOLIFY_WEBHOOK_URL }}"
+          COOLIFY_HOST=$(echo "$DEPLOY_URL" | sed 's|https\?://||;s|/.*||')
           curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+            "${DEPLOY_URL/$COOLIFY_HOST/$COOLIFY_IP}"
 
       - name: Disconnect from VPN
         if: always()
