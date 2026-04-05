@@ -307,7 +307,6 @@ jobs:
 
       - name: Connect to VPN
         run: |
-          # Resolve Coolify host before VPN changes DNS
           COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
           COOLIFY_IP=$(dig +short "$COOLIFY_HOST" @1.1.1.1 | tail -1)
           echo "COOLIFY_IP=$COOLIFY_IP" >> $GITHUB_ENV
@@ -315,14 +314,13 @@ jobs:
           echo "${{ secrets.WG_CI_CONFIG }}" | sudo tee /etc/wireguard/wg0.conf > /dev/null
           sudo chmod 600 /etc/wireguard/wg0.conf
           sudo wg-quick up wg0
+          sudo ip route add "$COOLIFY_IP/32" dev wg0 || true
 
       - name: Deploy via Coolify
         run: |
-          DEPLOY_URL="${{ secrets.COOLIFY_WEBHOOK_URL }}"
-          COOLIFY_HOST=$(echo "$DEPLOY_URL" | sed 's|https\?://||;s|/.*||')
           curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
-            "${DEPLOY_URL/$COOLIFY_HOST/$COOLIFY_IP}"
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
 
       - name: Disconnect from VPN
         if: always()
