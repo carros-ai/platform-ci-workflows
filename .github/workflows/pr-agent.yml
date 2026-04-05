@@ -6,6 +6,10 @@ on:
       ANTHROPIC_KEY:
         required: true
 
+concurrency:
+  group: pr-agent-${{ github.repository }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 permissions:
   issues: write
   pull-requests: write
@@ -18,7 +22,7 @@ jobs:
     name: PR Agent Review
     steps:
       - name: PR Agent
-        uses: qodo-ai/pr-agent@main
+        uses: qodo-ai/pr-agent@v0.34
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC.KEY: ${{ secrets.ANTHROPIC_KEY }}
@@ -29,12 +33,15 @@ jobs:
           github_action_config.auto_describe: "true"
           github_action_config.auto_improve: "true"
           pr_reviewer.require_focused_review: "true"
+          pr_reviewer.num_code_suggestions: "0"
           pr_reviewer.extra_instructions: |
             - Focus on bugs, security, and performance.
             - Flag code smells and clean code violations.
             - Suggest concrete improvements with code.
           pr_description.publish_labels: "true"
+          pr_description.keep_original_user_title: "true"
           pr_code_suggestions.num_code_suggestions: "4"
+          pr_code_suggestions.commitable_code_suggestions: "true"
           pr_code_suggestions.extra_instructions: |
             Focus on readability, performance, and security improvements.
           config.ignore_pr_files: >-
