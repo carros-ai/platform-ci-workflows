@@ -318,7 +318,10 @@ jobs:
 
       - name: Deploy via Coolify
         run: |
+          COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
           curl -fsSL \
+            --resolve "$COOLIFY_HOST:443:$COOLIFY_IP" \
+            --resolve "$COOLIFY_HOST:80:$COOLIFY_IP" \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
             "${{ secrets.COOLIFY_WEBHOOK_URL }}"
 
