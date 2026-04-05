@@ -34,8 +34,6 @@ jobs:
   sast:
     name: SAST
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +47,16 @@ jobs:
               --error --quiet .
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
 
   quality:
     name: Test & Lint
@@ -65,6 +73,11 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11.4
+
+      - name: Security check
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec ./...
 
       - name: Test
         run: go test ./... -race -coverprofile=coverage.out

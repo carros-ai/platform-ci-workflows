@@ -103,10 +103,6 @@ jobs:
   sast:
     name: SAST
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -122,15 +118,15 @@ jobs:
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
-      - name: CodeQL init
-        continue-on-error: true
-        uses: github/codeql-action/init@v3
+      - name: Filesystem scan
+        uses: aquasecurity/trivy-action@master
         with:
-          languages: javascript
-
-      - name: CodeQL analyze
-        continue-on-error: true
-        uses: github/codeql-action/analyze@v3
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
 
   # ── Build after security + quality + sast pass ────────────────────────────
 
@@ -207,7 +203,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: read
-      security-events: write
     steps:
       - uses: docker/login-action@v3
         with:
@@ -222,15 +217,7 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: 1
           ignore-unfixed: true
-          format: sarif
-          output: trivy-results.sarif
-
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true  # requires GitHub Advanced Security on private repos
-        with:
-          sarif_file: trivy-results.sarif
+          format: table
 
   # ── Deploy after scan passes ──────────────────────────────────────────────
 
