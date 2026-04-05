@@ -54,6 +54,9 @@ jobs:
           python-version: ${{ inputs.python-version }}
           cache: pip
 
+      - name: Configure git auth for private packages
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
@@ -72,6 +75,9 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
+
+      - name: Configure git auth for private packages
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install dependencies
         run: pip install -e ".[dev]"
