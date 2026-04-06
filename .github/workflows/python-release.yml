@@ -19,19 +19,12 @@ on:
         description: "URL to hit after deploy to confirm the service is up (e.g. https://myapp.carros-ai.online/health). Skip if empty."
         type: string
         default: ""
-      server-internal-ip:
-        description: "Private/internal IP of the Coolify server (e.g. Hetzner private IP). Used to route the deploy request through the VPN tunnel avoiding routing loops with the public IP."
-        type: string
-        default: ""
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
         required: true
       COOLIFY_DEPLOY_TOKEN:
         description: "Coolify API token with deploy permission"
-        required: true
-      WG_CI_CONFIG:
-        description: "WireGuard client config (.conf file content) for the CI peer"
         required: true
 
 concurrency:
@@ -309,41 +302,11 @@ jobs:
 
       # --- Deploy ---
 
-      - name: Connect to VPN
-        run: |
-          sudo apt-get install -y wireguard-tools resolvconf netcat-openbsd
-          echo "${{ secrets.WG_CI_CONFIG }}" | sudo tee /etc/wireguard/wg0.conf > /dev/null
-          sudo chmod 600 /etc/wireguard/wg0.conf
-          sudo wg-quick up wg0
-
-      - name: Debug VPN connectivity
-        if: inputs.server-internal-ip != ''
-        run: |
-          echo "=== WireGuard status ==="
-          sudo wg show
-          echo "=== Routes ==="
-          ip route | grep wg0
-          echo "=== Port probes (nc -zv host port, 3s timeout) ==="
-          nc -zv -w3 ${{ inputs.server-internal-ip }} 443 2>&1 || echo "443 CLOSED"
-          nc -zv -w3 ${{ inputs.server-internal-ip }} 80  2>&1 || echo "80 CLOSED"
-          nc -zv -w3 ${{ inputs.server-internal-ip }} 8000 2>&1 || echo "8000 CLOSED"
-          nc -zv -w3 10.8.0.1 443 2>&1 || echo "10.8.0.1:443 CLOSED"
-          nc -zv -w3 10.8.0.1 8000 2>&1 || echo "10.8.0.1:8000 CLOSED"
-
       - name: Deploy via Coolify
         run: |
-          COOLIFY_HOST=$(echo "${{ secrets.COOLIFY_WEBHOOK_URL }}" | sed 's|https\?://||;s|/.*||')
-          RESOLVE_ARGS=""
-          if [ -n "${{ inputs.server-internal-ip }}" ]; then
-            RESOLVE_ARGS="--resolve $COOLIFY_HOST:443:${{ inputs.server-internal-ip }} --resolve $COOLIFY_HOST:80:${{ inputs.server-internal-ip }}"
-          fi
-          curl -fsSL $RESOLVE_ARGS \
+          curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
             "${{ secrets.COOLIFY_WEBHOOK_URL }}"
-
-      - name: Disconnect from VPN
-        if: always()
-        run: sudo wg-quick down wg0
 
       - name: Smoke test
         if: inputs.health-check-url != ''
