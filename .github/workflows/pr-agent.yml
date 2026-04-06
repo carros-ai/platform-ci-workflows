@@ -32,8 +32,8 @@ jobs:
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
           github_action_config.auto_improve: "true"
-          pr_reviewer.require_focused_review: "true"
-          pr_reviewer.num_code_suggestions: "0"
+          pr_reviewer.require_focused_review: "false"
+          pr_reviewer.num_code_suggestions: "4"
           pr_reviewer.extra_instructions: |
             - Focus on bugs, security, and performance.
             - Flag code smells and clean code violations.
