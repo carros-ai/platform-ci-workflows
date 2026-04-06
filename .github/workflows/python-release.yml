@@ -311,10 +311,24 @@ jobs:
 
       - name: Connect to VPN
         run: |
-          sudo apt-get install -y wireguard-tools resolvconf
+          sudo apt-get install -y wireguard-tools resolvconf netcat-openbsd
           echo "${{ secrets.WG_CI_CONFIG }}" | sudo tee /etc/wireguard/wg0.conf > /dev/null
           sudo chmod 600 /etc/wireguard/wg0.conf
           sudo wg-quick up wg0
+
+      - name: Debug VPN connectivity
+        if: inputs.server-internal-ip != ''
+        run: |
+          echo "=== WireGuard status ==="
+          sudo wg show
+          echo "=== Routes ==="
+          ip route | grep wg0
+          echo "=== Port probes (nc -zv host port, 3s timeout) ==="
+          nc -zv -w3 ${{ inputs.server-internal-ip }} 443 2>&1 || echo "443 CLOSED"
+          nc -zv -w3 ${{ inputs.server-internal-ip }} 80  2>&1 || echo "80 CLOSED"
+          nc -zv -w3 ${{ inputs.server-internal-ip }} 8000 2>&1 || echo "8000 CLOSED"
+          nc -zv -w3 10.8.0.1 443 2>&1 || echo "10.8.0.1:443 CLOSED"
+          nc -zv -w3 10.8.0.1 8000 2>&1 || echo "10.8.0.1:8000 CLOSED"
 
       - name: Deploy via Coolify
         run: |
