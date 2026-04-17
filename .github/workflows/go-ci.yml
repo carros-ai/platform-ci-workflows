@@ -45,8 +45,6 @@ jobs:
               --config p/security-audit \
               --config p/owasp-top-ten \
               --error --quiet .
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
       - name: Filesystem scan
         uses: aquasecurity/trivy-action@master
@@ -61,6 +59,9 @@ jobs:
   quality:
     name: Test & Lint
     runs-on: ubuntu-latest
+    env:
+      GOPRIVATE: github.com/carros-ai/*
+      GONOSUMDB: github.com/carros-ai/*
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +69,11 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           cache: true
+
+      - name: Configure git auth for private modules
+        run: |
+          TOKEN="${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
       - name: Lint
         uses: golangci/golangci-lint-action@v9
