@@ -45,6 +45,8 @@ on:
 jobs:
   ci:
     uses: carros-ai/platform-ci-workflows/.github/workflows/go-ci.yml@main
+    with:
+      coverage-threshold: 80 # override per-service while coverage is being built up
 ```
 
 **Python:**
@@ -90,6 +92,7 @@ jobs:
     with:
       app-name: my-service-name
       release: ${{ github.event_name == 'push' }}
+      coverage-threshold: 80 # override per-service while coverage is being built up
     secrets: inherit
 ```
 
