@@ -127,15 +127,17 @@ jobs:
 
 ---
 
-### 3. Add repository secret
+### 3. Add repository secrets
 
 In the GitHub repo settings → Secrets → Actions:
 
 | Secret | Value |
 |---|---|
 | `COOLIFY_WEBHOOK_URL` | Deploy webhook URL from the Coolify service panel |
+| `COOLIFY_DEPLOY_TOKEN` | Coolify API/deploy token used as the webhook bearer token |
+| `GH_TOKEN` | Optional PAT with access to private `carros-ai/*` modules/packages when `GITHUB_TOKEN` is not enough |
 
-> The `GITHUB_TOKEN` for ghcr.io authentication is provided automatically — no extra setup needed.
+> The `GITHUB_TOKEN` for ghcr.io authentication is provided automatically. If the Coolify secrets are missing, release workflows still build, scan, sign, and publish the image, but skip deploy with a warning instead of failing at workflow startup.
 
 ---
 

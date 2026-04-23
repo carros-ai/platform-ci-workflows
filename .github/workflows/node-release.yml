@@ -22,10 +22,10 @@ on:
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
-        required: true
+        required: false
       COOLIFY_DEPLOY_TOKEN:
         description: "Coolify API token with deploy permission"
-        required: true
+        required: false
 
 concurrency:
   group: ${{ github.repository }}-${{ inputs.app-name }}-release-${{ github.ref }}
@@ -226,6 +226,8 @@ jobs:
     needs: [build, scan]
     runs-on: ubuntu-latest
     environment: production  # enables GitHub Insights DORA metrics
+    env:
+      HAS_COOLIFY_DEPLOY: ${{ secrets.COOLIFY_WEBHOOK_URL != '' && secrets.COOLIFY_DEPLOY_TOKEN != '' }}
     permissions:
       contents: write   # create GitHub release
       id-token: write   # Cosign OIDC keyless signing
@@ -268,14 +270,20 @@ jobs:
 
       # --- Deploy ---
 
+      - name: Skip Coolify deploy
+        if: env.HAS_COOLIFY_DEPLOY != 'true'
+        run: |
+          echo "::warning::COOLIFY_WEBHOOK_URL or COOLIFY_DEPLOY_TOKEN is not configured; image was built and signed, but deploy was skipped."
+
       - name: Deploy via Coolify
+        if: env.HAS_COOLIFY_DEPLOY == 'true'
         run: |
           curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
             "${{ secrets.COOLIFY_WEBHOOK_URL }}"
 
       - name: Smoke test
-        if: inputs.health-check-url != ''
+        if: env.HAS_COOLIFY_DEPLOY == 'true' && inputs.health-check-url != ''
         run: |
           curl -fsSL \
             --retry 10 \
