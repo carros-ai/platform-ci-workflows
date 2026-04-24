@@ -168,3 +168,28 @@ ghcr.io/carros-ai/<app-name>:<tag>
 | `1.2.3` | Releases only (merge to main) |
 | `1.2` | Releases only |
 | `1` | Releases only |
+
+---
+
+## Consumers
+
+Which services use which reusable workflow (as of 2026-04-21):
+
+| Service | ci.yml reusable | release.yml reusable | Notes |
+|---|---|---|---|
+| `inventory-api` | `go-ci.yml@main` | `go-release.yml@main` | coverage-threshold: 20 (ramping up) |
+| `enrichment-api` | `go-ci.yml@main` | `go-release.yml@main` | coverage-threshold: 20 (ramping up) |
+| `recommendations-api` | `go-ci.yml@main` | `go-release.yml@main` | coverage-threshold: 20 (ramping up) |
+| `telemetry-go` | `go-ci.yml@main` | — (tag-triggered GitHub Release, no Docker) | Go library; release.yml kept as inline tag workflow |
+| `photos-worker` | `python-ci.yml@main` | `python-release.yml@main` | python-version: 3.13 |
+| `agents-api` | `python-ci.yml@main` | `python-release.yml@main` | python-version: 3.13 |
+| `whatsapp-collector` | `node-ci.yml@main` | — (custom inline multi-image build) | Dual-image build (listener + worker) with sibling repo checkout |
+| `web-app` | `node-ci.yml@main` | `node-release.yml@main` | Next.js 16, Biome linter auto-detected |
+
+**Version pin:** All consumers use `@main`. Pin to a tag (e.g., `@v1`) once `platform-ci-workflows` ships its first stable release.
+
+**Secrets required** (configure per-repo in GitHub → Settings → Secrets → Actions):
+- `COOLIFY_WEBHOOK_URL` — deploy webhook URL from Coolify service panel
+- `COOLIFY_DEPLOY_TOKEN` — Coolify API token
+- `GH_TOKEN` — PAT for private `carros-ai/*` module access (Go services + whatsapp-collector sibling checkout)
+- `RENOVATE_TOKEN` — PAT for Renovate bot (weekly dependency updates, Mondays 04:00 UTC)
