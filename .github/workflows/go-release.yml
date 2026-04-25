@@ -277,18 +277,19 @@ jobs:
       # --- Deploy ---
 
       - name: Deploy via Coolify
-        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' && secrets.COOLIFY_DEPLOY_TOKEN != '' }}
+        env:
+          WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+        if: env.WEBHOOK != '' && env.TOKEN != ''
         run: |
-          curl -fsSL \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+          curl -fsSL -H "Authorization: Bearer $TOKEN" "$WEBHOOK"
 
       - name: Smoke test
-        if: ${{ secrets.COOLIFY_WEBHOOK_URL != '' && secrets.COOLIFY_DEPLOY_TOKEN != '' && inputs.health-check-url != '' }}
+        env:
+          WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+        if: env.WEBHOOK != '' && env.TOKEN != '' && inputs.health-check-url != ''
         run: |
-          curl -fsSL \
-            --retry 10 \
-            --retry-delay 15 \
-            --retry-connrefused \
+          curl -fsSL --retry 10 --retry-delay 15 --retry-connrefused \
             "${{ inputs.health-check-url }}"
           echo "Service is healthy"
