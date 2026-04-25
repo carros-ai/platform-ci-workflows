@@ -19,6 +19,10 @@ on:
         description: "URL to hit after deploy to confirm the service is up (e.g. https://myapp.carros-ai.online/health). Skip if empty."
         type: string
         default: ""
+      audit-ignore:
+        description: "Space-separated list of CVE/GHSA IDs to skip in pip-audit (use for upstream issues without a fix yet)."
+        type: string
+        default: ""
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
@@ -67,12 +71,19 @@ jobs:
           fi
 
       - name: Dependency audit
+        env:
+          AUDIT_IGNORE: ${{ inputs.audit-ignore }}
         run: |
+          # Build --ignore-vuln args from the input list (one flag per ID).
+          ignore_args=""
+          for id in $AUDIT_IGNORE; do
+            ignore_args="$ignore_args --ignore-vuln $id"
+          done
           if [ -f "uv.lock" ]; then
-            uv run pip-audit
+            uv run pip-audit $ignore_args
           else
             pip install pip-audit
-            pip-audit
+            pip-audit $ignore_args
           fi
 
   quality:
