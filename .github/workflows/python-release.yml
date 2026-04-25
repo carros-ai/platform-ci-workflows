@@ -23,6 +23,10 @@ on:
         description: "Space-separated list of CVE/GHSA IDs to skip in pip-audit (use for upstream issues without a fix yet)."
         type: string
         default: ""
+      coverage-fail-under:
+        description: "Coverage threshold for pytest --cov-fail-under. Lower it temporarily when restoring large surfaces; raise back to 80 once unit coverage catches up."
+        type: number
+        default: 80
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
@@ -139,11 +143,13 @@ jobs:
           fi
 
       - name: Test
+        env:
+          COV_FAIL_UNDER: ${{ inputs.coverage-fail-under }}
         run: |
           if [ -f "uv.lock" ]; then
-            uv run pytest --tb=short --cov --cov-fail-under=80
+            uv run pytest --tb=short --cov --cov-fail-under="$COV_FAIL_UNDER"
           else
-            pytest --tb=short --cov --cov-fail-under=80
+            pytest --tb=short --cov --cov-fail-under="$COV_FAIL_UNDER"
           fi
 
   sast:
