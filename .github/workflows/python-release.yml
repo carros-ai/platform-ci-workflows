@@ -232,6 +232,16 @@ jobs:
             type=raw,value=${{ steps.version.outputs.minor }},enable=${{ inputs.release }}
             type=raw,value=${{ steps.version.outputs.major }},enable=${{ inputs.release }}
 
+      # Free disk on the runner before the build. ML images bake in ONNX +
+      # PyTorch + opencv + paddleocr + ~370MB of model weights and routinely
+      # OOM-on-disk on the standard ubuntu-latest 14GB partition. Trims
+      # ~25GB of preinstalled SDKs we never use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                       /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+          df -h /
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/build-push-action@v6
