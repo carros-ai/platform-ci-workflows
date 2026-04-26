@@ -35,6 +35,10 @@ on:
         description: "Minimum statement coverage percentage required for the test step."
         type: number
         default: 80
+      build-args:
+        description: "Multiline KEY=VALUE pairs forwarded to docker/build-push-action as --build-arg. Use for NEXT_PUBLIC_* in Next.js apps that must be inlined at build time."
+        type: string
+        default: ""
     secrets:
       COOLIFY_WEBHOOK_URL:
         description: "Coolify deploy webhook URL for this service"
@@ -212,6 +216,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ inputs.build-args }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           secrets: |
