@@ -32,6 +32,8 @@ jobs:
 
       - name: Install
         run: npm ci
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Dependency audit
         run: npm audit --audit-level=high
@@ -77,6 +79,8 @@ jobs:
 
       - name: Install
         run: npm ci
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Lint
         run: |
