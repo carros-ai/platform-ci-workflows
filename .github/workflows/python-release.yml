@@ -327,10 +327,16 @@ jobs:
 
       - name: Deploy via Coolify
         if: env.HAS_COOLIFY_DEPLOY == 'true'
+        # &force=true bypasses Coolify's image-pull cache. Without it,
+        # back-to-back deploys can serve a stale `:latest` tag because
+        # Coolify decides the local image hash matches and skips the pull —
+        # discovered when autohub-web's NEXT_PUBLIC_* env fix wouldn't
+        # land in the running container until a forced redeploy. See
+        # platform/operations/coolify-deploy.md § Force-pull on deploy.
         run: |
           curl -fsSL \
             -H "Authorization: Bearer ${{ secrets.COOLIFY_DEPLOY_TOKEN }}" \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}&force=true"
 
       - name: Smoke test
         if: env.HAS_COOLIFY_DEPLOY == 'true' && inputs.health-check-url != ''

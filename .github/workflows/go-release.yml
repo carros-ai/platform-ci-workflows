@@ -281,8 +281,14 @@ jobs:
           WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_URL }}
           TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
         if: env.WEBHOOK != '' && env.TOKEN != ''
+        # &force=true bypasses Coolify's image-pull cache. Without it,
+        # back-to-back deploys can serve a stale `:latest` tag because
+        # Coolify decides the local image hash matches and skips the pull —
+        # discovered when autohub-web's NEXT_PUBLIC_* env fix wouldn't
+        # land in the running container until a forced redeploy. See
+        # platform/operations/coolify-deploy.md § Force-pull on deploy.
         run: |
-          curl -fsSL -H "Authorization: Bearer $TOKEN" "$WEBHOOK"
+          curl -fsSL -H "Authorization: Bearer $TOKEN" "${WEBHOOK}&force=true"
 
       - name: Smoke test
         env:

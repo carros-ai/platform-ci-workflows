@@ -136,11 +136,13 @@ In the GitHub repo settings → Secrets → Actions:
 
 | Secret | Value |
 |---|---|
-| `COOLIFY_WEBHOOK_URL` | Deploy webhook URL from the Coolify service panel |
+| `COOLIFY_WEBHOOK_URL` | Deploy webhook URL from the Coolify service panel — keep the bare `?uuid=...` form, the workflows append `&force=true` at call time |
 | `COOLIFY_DEPLOY_TOKEN` | Coolify API/deploy token used as the webhook bearer token |
 | `GH_TOKEN` | Optional PAT with access to private `carros-ai/*` modules/packages when `GITHUB_TOKEN` is not enough |
 
 > The `GITHUB_TOKEN` for ghcr.io authentication is provided automatically. If the Coolify secrets are missing, release workflows still build, scan, sign, and publish the image, but skip deploy with a warning instead of failing at workflow startup.
+
+> **About `&force=true`**: every deploy step in this repo appends `&force=true` to the webhook URL so Coolify always re-pulls the image instead of trusting its local cache (it sometimes decides the `:latest` hash hasn't changed when in fact a fresh push happened). The flag is hardcoded in the workflow YAML, not in your secret — see `platform/operations/coolify-deploy.md § Force-pull on deploy` for the incident this came out of.
 
 ---
 
