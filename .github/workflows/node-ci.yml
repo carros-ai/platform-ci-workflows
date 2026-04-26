@@ -7,6 +7,22 @@ on:
         description: "Node.js version"
         type: string
         default: "20"
+      coverage-lines-threshold:
+        description: "Minimum statement/line coverage percentage required for the test step."
+        type: number
+        default: 80
+      coverage-functions-threshold:
+        description: "Minimum function coverage percentage required for the test step."
+        type: number
+        default: 80
+      coverage-branches-threshold:
+        description: "Minimum branch coverage percentage required for the test step."
+        type: number
+        default: 80
+      coverage-statements-threshold:
+        description: "Minimum statement coverage percentage required for the test step."
+        type: number
+        default: 80
 
 concurrency:
   group: ${{ github.repository }}-node-ci-${{ github.ref }}
@@ -100,13 +116,13 @@ jobs:
         run: |
           if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ] || [ -f "vitest.config.mts" ]; then
             npx vitest run --coverage \
-              --coverage.thresholds.lines=80 \
-              --coverage.thresholds.functions=80 \
-              --coverage.thresholds.branches=80 \
-              --coverage.thresholds.statements=80
+              --coverage.thresholds.lines=${{ inputs.coverage-lines-threshold }} \
+              --coverage.thresholds.functions=${{ inputs.coverage-functions-threshold }} \
+              --coverage.thresholds.branches=${{ inputs.coverage-branches-threshold }} \
+              --coverage.thresholds.statements=${{ inputs.coverage-statements-threshold }}
           elif grep -q '"jest"' package.json 2>/dev/null || [ -f "jest.config.js" ] || [ -f "jest.config.ts" ]; then
             npx jest --coverage \
-              --coverageThreshold='{"global":{"lines":80,"functions":80,"branches":80,"statements":80}}'
+              --coverageThreshold='{"global":{"lines":${{ inputs.coverage-lines-threshold }},"functions":${{ inputs.coverage-functions-threshold }},"branches":${{ inputs.coverage-branches-threshold }},"statements":${{ inputs.coverage-statements-threshold }}}}'
           else
             npm test
           fi
