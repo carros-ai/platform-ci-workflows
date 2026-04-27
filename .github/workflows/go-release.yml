@@ -296,6 +296,6 @@ jobs:
           TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
         if: env.WEBHOOK != '' && env.TOKEN != '' && inputs.health-check-url != ''
         run: |
-          curl -fsSL --retry 10 --retry-delay 15 --retry-connrefused \
+          curl -fsSLk --retry 10 --retry-delay 15 --retry-connrefused \
             "${{ inputs.health-check-url }}"
           echo "Service is healthy"
